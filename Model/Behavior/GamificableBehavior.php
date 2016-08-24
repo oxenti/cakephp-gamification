@@ -4,33 +4,33 @@ class GamificableBehavior extends ModelBehavior {
 
 	public function setup(Model $Model, $settings = array()) {
 	    if (!isset($this->settings[$Model->alias])) {
-	    
+
 	    	$rulesSettings = $settings['rules'];
 
 	        $this->settings[$Model->alias] = array(
 	            'rules' => $rulesSettings,
 	        );
-			
-			$this->Rule = ClassRegistry::init('Rule');
+
+			$this->GameRule = ClassRegistry::init('GameRule');
 	        $rules = array();
 	        for($i = 0; $i < count($rulesSettings); $i++)
 	        {
 		        $rule = array(
-						'Rule' => array(
+						'GameRule' => array(
 							'model' => $Model->alias,
 							'action' => $rulesSettings[$i]['action'],
 							'points' => $rulesSettings[$i]['points'],
 							'occurence' => $rulesSettings[$i]['occurence'],
 							'badge_id' => 1
 						)
-					);	
-				if (!$this->Rule->hasAny($rule["Rule"])){
-					array_push($rules,$rule);		
+					);
+				if (!$this->GameRule->hasAny($rule["GameRule"])){
+					array_push($rules,$rule);
 				}
 			}
-			$this->Rule->saveAll($rules);
+			$this->GameRule->saveAll($rules);
 	    }
-	    
+
 	    $this->settings[$Model->alias] = array_merge(
 	    	$this->settings[$Model->alias], (array)$settings
 	    );
@@ -43,39 +43,43 @@ class GamificableBehavior extends ModelBehavior {
 			{
 				$action = 'Add';
 			}
-			
-			savePoints($Model,$action);
+			$this->savePoints($Model,$action);
 	}
-	
+
 	public function afterDelete(Model $Model) {
 			$action = 'Delete';
-			
-			savePoints($Model,$action);
+
+			$this->savePoints($Model,$action);
 	}
-	
+
 	function savePoints(Model $Model,$action)
 	{
-		$this->Rule = ClassRegistry::init('Rule');
-			$this->Point = ClassRegistry::init('Point');
-			
-			$optionRules = array('conditions' => array(
-				'Rule.model = \''.$Model->alias.'\'',
-				'Rule.action = \''.$action.'\''
-			));
-			$rules = $this->Rule->find('first', $optionRules);
-				
-			if($rules) {	
-				$points = array(
-					'Point' => array(
-						'user_id' => CakeSession::read("Auth.User.id"),
-						'rule_id' => $rules['Rule']['id'],
-						'foreign_key' => $Model->data[$Model->alias]['id'],
-						'points' => $rules['Rule']['points'],
-						'badge_id' => $rules['Rule']['badge_id']
-					)
-				);
-				$this->Point->save($points);
+		$this->GameRule = ClassRegistry::init('GameRule');
+		$this->GamePoint = ClassRegistry::init('GamePoint');
+
+		$optionRules = array('conditions' => array(
+			'GameRule.model = \''.$Model->alias.'\'',
+			'GameRule.action = \''.$action.'\''
+		));
+		$rules = $this->GameRule->find('first', $optionRules);
+
+		if($rules) {
+			if ($action == 'Edit' && !$Model->data[$Model->name]['is_active']) {
+				$rules['GameRule']['points'] = -$rules['GameRule']['points'];
+			} else {
+				$rules['GameRule']['points'] = 0;
 			}
+			$points = array(
+				'GamePoint' => array(
+					'user_id' => $Model->data[$Model->name]['profile_id'],
+					'rule_id' => $rules['GameRule']['id'],
+					'foreign_key' => $Model->data[$Model->alias]['id'],
+					'points' => $rules['GameRule']['points'],
+					'badge_id' => $rules['GameRule']['badge_id']
+				)
+			);
+			$this->GamePoint->save($points);
+		}
 	}
 }
 
